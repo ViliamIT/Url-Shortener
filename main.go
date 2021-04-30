@@ -6,7 +6,7 @@ import (
 	"github.com/gorilla/mux"
 	"gorm.io/driver/mysql"
 	"gorm.io/gorm"
-
+	"html/template"
 	"log"
 	"net/http"
 )
@@ -29,20 +29,15 @@ type MyUrl struct {
 	// HASH of user password. Use SHA2 algorithm
 	ShortUrl string `json:"shortUrl,omitempty"`
 
-	//Companies list of associated companies
-	//Companies []LoginCompany `gorm:"many2many:UserCompanies;association_jointable_foreignkey:companyId;jointable_foreignkey:userId"`
 }
 
 
-
-// let's declare a global Articles array
-// that we can then populate in our main function
-// to simulate a database
 
 var Urls []MyUrl
 type Articles []Article
 var articles Articles
 var db *gorm.DB
+var templates *template.Template
 
 func dbinit() {
 	fmt.Println("Connecting to databse ...")
@@ -57,16 +52,17 @@ func dbinit() {
 }
 
 func homepage(w http.ResponseWriter, r *http.Request)  {
-	fmt.Fprintf(w,"Homepage Endpoint hit!")
+	//t,_:=template.ParseFiles("Index.html")
+	//ExecuteTemplate(w,t)
+
+	templates.ExecuteTemplate(w, "Index.html", nil)
 }
 
 func handleRequests(){
 
 	myRouter:=mux.NewRouter().StrictSlash(true)
-
-	myRouter.HandleFunc("/", homepage)
+	myRouter.HandleFunc("/homepage", homepage)
 	myRouter.HandleFunc("/create", createEndpoint).Methods("POST")
-	myRouter.HandleFunc("/getUrl", getUrl).Methods("GET")
 	myRouter.HandleFunc("/{id}", RedirectToRoot).Methods("GET")
 	log.Fatal(http.ListenAndServe(":8080",myRouter))
 }
@@ -88,9 +84,11 @@ func createEndpoint(w http.ResponseWriter, request *http.Request) {
 
 	var url MyUrl
 	var url2 MyUrl
+
 	_ = json.NewDecoder(request.Body).Decode(&url)
-	var n1qlParams []interface{}
-	n1qlParams = append(n1qlParams,url.LongUrl)
+	//var n1qlParams []interface{}
+	//n1qlParams = append(n1qlParams,url.LongUrl)
+	url.LongUrl=request.FormValue("url")
 	query := db.Table("url").Find(&url,"LongUrl=?")
 	if query.RowsAffected != 0{
 		log.Print("url found in database!")
@@ -113,19 +111,14 @@ func createEndpoint(w http.ResponseWriter, request *http.Request) {
 			w.WriteHeader(201)
 		}
 		log.Print("url created!")
-		json.NewEncoder(w).Encode(url)
+		json.NewEncoder(w).Encode(url.ShortUrl)
 	}
 
-	//result.RowsAffected
-
 }
 
-
-func getUrl(writer http.ResponseWriter, request *http.Request) {
-
-}
 
 func main() {
+	templates = template.Must(template.ParseGlob("templates/*.html"))
 	fmt.Println("Rest API v2.0 - Mux Routers")
 	dbinit()
 	handleRequests()
