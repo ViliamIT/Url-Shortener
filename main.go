@@ -28,13 +28,12 @@ type MyUrl struct {
 
 	// HASH of user password. Use SHA2 algorithm
 	ShortUrl string `json:"shortUrl,omitempty"`
-
 }
 
-
-
 var Urls []MyUrl
+
 type Articles []Article
+
 var articles Articles
 var db *gorm.DB
 var templates *template.Template
@@ -51,33 +50,30 @@ func dbinit() {
 	}
 }
 
-func homepage(w http.ResponseWriter, r *http.Request)  {
-	//t,_:=template.ParseFiles("Index.html")
-	//ExecuteTemplate(w,t)
-
+func homepage(w http.ResponseWriter, r *http.Request) {
 	templates.ExecuteTemplate(w, "Index.html", nil)
 }
 
-func handleRequests(){
+func handleRequests() {
 
-	myRouter:=mux.NewRouter().StrictSlash(true)
+	myRouter := mux.NewRouter().StrictSlash(true)
 	myRouter.HandleFunc("/homepage", homepage)
 	myRouter.HandleFunc("/create", createEndpoint).Methods("POST")
 	myRouter.HandleFunc("/{id}", RedirectToRoot).Methods("GET")
-	log.Fatal(http.ListenAndServe(":8080",myRouter))
+	log.Fatal(http.ListenAndServe(":8080", myRouter))
 }
 
 func RedirectToRoot(writer http.ResponseWriter, request *http.Request) {
-params := mux.Vars(request)
+	params := mux.Vars(request)
 	var url MyUrl
 	log.Println("finding original url...")
 	s := params["id"]
-result := db.Table("url").Find(&url,s)
-	if result.Error != nil{
+	result := db.Table("url").Find(&url, s)
+	if result.Error != nil {
 		writer.WriteHeader(500)
 	}
 	log.Println("redirecting...")
-http.Redirect(writer,request,url.LongUrl,301)
+	http.Redirect(writer, request, url.LongUrl, 301)
 }
 
 func createEndpoint(w http.ResponseWriter, request *http.Request) {
@@ -85,29 +81,28 @@ func createEndpoint(w http.ResponseWriter, request *http.Request) {
 	var url MyUrl
 	var url2 MyUrl
 
-	_ = json.NewDecoder(request.Body).Decode(&url)
-	//var n1qlParams []interface{}
-	//n1qlParams = append(n1qlParams,url.LongUrl)
-	url.LongUrl=request.FormValue("url")
-	query := db.Table("url").Find(&url,"LongUrl=?")
-	if query.RowsAffected != 0{
+	request.ParseForm()
+	url.LongUrl = request.FormValue("url")
+	query := db.Table("url").Find(&url, "LongUrl=?")
+	if query.RowsAffected != 0 {
 		log.Print("url found in database!")
 		w.WriteHeader(200)
 		json.NewEncoder(w).Encode(url)
-	}else{
+	} else {
 		log.Print("creating new url...")
 		//w.WriteHeader(404)
 		var ID int32
-		query :=db.Table("url").Last(&url2)
-		if query.Error != nil{
+		query := db.Table("url").Last(&url2)
+		if query.Error != nil {
 			w.WriteHeader(500)
 		}
-		ID=url2.ID+1
-		url.ShortUrl= "http://localhost:8080/"+fmt.Sprint(ID)
+		ID = url2.ID + 1
+		url.ID=ID
+		url.ShortUrl = "http://localhost:8080/" + fmt.Sprint(ID)
 		result := db.Table("url").Create(&url)
-		if result.Error != nil{
+		if result.Error != nil {
 			w.WriteHeader(500)
-		}else{
+		} else {
 			w.WriteHeader(201)
 		}
 		log.Print("url created!")
@@ -116,14 +111,9 @@ func createEndpoint(w http.ResponseWriter, request *http.Request) {
 
 }
 
-
 func main() {
 	templates = template.Must(template.ParseGlob("templates/*.html"))
 	fmt.Println("Rest API v2.0 - Mux Routers")
 	dbinit()
 	handleRequests()
 }
-
-
-
-
